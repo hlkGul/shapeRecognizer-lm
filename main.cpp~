@@ -1,0 +1,124 @@
+#include <iostream>
+#include "fourierDescriptor.h"
+#include "histogram.h"
+#include "hu.h"
+#include "InnerDistance.h"
+#include "statisticalDescriptor.h"
+
+string className[10000];
+
+int main()
+{
+	ofstream fp;	
+
+	struct dirent *dinfo;
+  	string filename="/home/alico/Masaüstü/FINAL/testSet/";
+  	string currentImage[10000];
+ 	 DIR *dp;
+  	int sum=0; 	
+	
+
+	  dp = opendir("/home/alico/Masaüstü/FINAL/testSet/");
+	
+	fp.open("MyFourier+HistogramTest+ID+Hu.csv");
+	if (dp == NULL) {
+	exit(1);
+	}
+	
+	fp<<"\" \",";
+	for(int i=0;i<7;i++)
+	fp<<"\"Hu Moments"<<i<<"\""<<",";
+
+	fp<<"\"BlackRate\""<<",";
+	fp<<"\"WhiteRate\""<<",";	
+
+	for(int i=0;i<25;i++)
+	fp<<"\"Values"<<i<<"\""<<",";
+	for(int i=0;i<11;i++)	
+	fp<<"\"ID"<<i<<"\""<<",";	
+	for(int i=0;i<9;i++)	
+	fp<<"\"SD"<<i<<"\""<<",";	
+
+	fp<<"\"ClassName\""<<endl;
+
+	while ((dinfo = readdir(dp)) != NULL)
+	{
+		currentImage[sum]=dinfo->d_name;
+		sum++;
+	}
+	closedir(dp);
+
+	
+	for(int k=2;k<sum;k++)
+	{
+		
+		
+		for(int i=1;i<2;i++)
+		{
+		filename.append(currentImage[k]);
+		 
+		for(int t=0;t<100;t++)
+		{
+		
+			
+			if(currentImage[k][t]=='-')
+			{
+			break;
+			}
+			className[k]+=currentImage[k][t];
+		}
+		
+		cout<<currentImage[k]<<" ";
+		fp<<currentImage[k]<<",";
+
+		Histogram hg;
+		hg.histogramCoding(filename);
+		Fourier fourier;
+		fourier.FourierDescriptor(filename);
+		InnerDistance id;
+		id.InnerDistanceCalculate(filename);						 
+		huMoments huM;
+		huM.calculateCentralAndRawMoments(filename);
+		statisticalDescriptor sd;
+		sd.StatisticalDescriptor(filename);
+
+		for(int i=1;i<=7;i++)
+		fp<<huM.getHuMoments(i)<<",";
+
+		fp<<hg.getBlackRate()<<",";
+		fp<<hg.getWhiteRate()<<",";
+
+
+		for(int i=0;i<25;i++)
+		{
+			fp<<fourier.getFourierCoefficient(i)<<",";
+		}
+		
+		for(int i=0;i<6;i++)
+		fp<<id.getDistances1(i)<<",";
+		for(int i=0;i<5;i++)
+		fp<<id.getDistances2(i)<<",";	
+
+		for(int i=0;i<9;i++)
+		{
+		VideoCapture cap(filename);
+		Mat image;
+		cap>>image;
+	
+		fp<<sd.getRatesPerSquare(i)/((3.14)*(2*i+1)*(2*i+1))*(image.rows*image.cols)/10000<<",";	
+		}
+			
+		 cout<<className[k]<<" "<<endl;
+		// fp<<className[k]<<endl;
+		 fp<<"\""<<className[k]<<"\""<<endl;
+		 //fp<<endl;
+		filename.clear();
+		 filename="/home/alico/Masaüstü/FINAL/testSet/";
+		}
+		
+	}
+
+ 
+
+  return 0;
+}

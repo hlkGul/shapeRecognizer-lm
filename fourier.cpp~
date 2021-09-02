@@ -1,0 +1,214 @@
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <fstream>
+
+#define PI 3.14159
+
+using namespace cv;
+using namespace std;
+
+string modelName[10000];
+ofstream fp;	
+
+
+double EucliedianDistance(int value1X,int value1Y,int value2X,int value2Y);
+void FourierDescriptor(string filename);
+double findMaximumDistanceToCentroid(double centroidX,double centroidY,Mat image);
+
+int main(int argc, char ** argv)
+{
+   struct dirent *dinfo;
+  string filename="/home/alico/Masaüstü/testSet/";
+  string currentImage[10000];
+  DIR *dp;
+  int sum=0; 	
+	
+
+  dp = opendir("/home/alico/Masaüstü/testSet/");
+	
+	
+	
+	fp.open("FourierTest.csv");
+	if (dp == NULL) {
+	exit(1);
+	}
+	
+	
+	fp<<"\" \",";
+	for(int i=0;i<25;i++)
+	fp<<"\"Values"<<i<<"\""<<",";
+	
+	fp<<"\"ModelName\""<<endl;
+
+	while ((dinfo = readdir(dp)) != NULL)
+	{
+		currentImage[sum]=dinfo->d_name;
+		sum++;
+	}
+	closedir(dp);
+
+	
+	for(int k=2;k<sum;k++)
+	{
+		
+		
+		for(int i=1;i<2;i++)
+		{
+		filename.append(currentImage[k]);
+		 
+		for(int t=0;t<100;t++)
+		{
+		
+			
+			if(currentImage[k][t]=='-')
+			{
+			break;
+			}
+			modelName[k]+=currentImage[k][t];
+		}
+		
+		cout<<currentImage[k]<<" ";
+		fp<<currentImage[k]<<",";
+		 
+		 FourierDescriptor(filename);
+		 cout<<modelName[k]<<" "<<endl;
+		// fp<<modelName[k]<<endl;
+		 fp<<"\""<<modelName[k]<<"\""<<endl;
+		 //fp<<endl;
+		filename.clear();
+		 filename="/home/alico/Masaüstü/testSet/";
+		}
+		
+	}
+
+ 
+
+  return 0;
+}
+
+void FourierDescriptor(string filename)
+{
+	Mat image;
+    VideoCapture cap(filename);
+    int sumx=0,sumy=0,pixelNum=0;
+    double centroidX=0,centroidY=0; 
+    
+	cap>>image;
+	
+	cout<<image.rows<<endl<<image.cols<<endl;
+	//Centroid Bulma
+	for(int i=0;i<image.rows;i++)
+	{
+		for(int j=0;j<image.cols;j++)
+		{
+	      	if(image.at<cv::Vec3b>(i,j) == cv::Vec3b(255,255,255)
+	      		||image.at<cv::Vec3b>(i,j) != cv::Vec3b(0,0,0))
+	      	{
+	      		sumx+=i;
+	      		sumy+=j;
+	      		pixelNum++;
+	      	}
+		}
+	}
+	
+	centroidX=static_cast<double>(sumx)/pixelNum;
+	centroidY=static_cast<double>(sumy)/pixelNum;	
+	//Centroid Sonu
+	double maxDistance=0;
+	maxDistance=findMaximumDistanceToCentroid(centroidX,centroidY,image);
+	
+	int maxFrequenceI=5,maxFrequenceJ=5;	
+	double realPartition[5][5]={0};
+	double imaginaryPartition[5][5]={0};	
+	
+	// Fourier Hesabı
+	for(int i=0;i<maxFrequenceI;i++)
+	{
+		for(int j=0;j<maxFrequenceJ;j++)
+		{
+			for(int x=0;x<image.rows;x++)
+			{
+				for(int y=0;y<image.cols;y++)
+				{
+					//amplitude
+					double radius= sqrt(pow((x-maxDistance),2)+pow((y-maxDistance),2));
+					//Phase angle 
+					double theta=atan2(y-maxDistance,x-maxDistance);
+					if(theta<0.0)
+					{
+						theta+= 2*PI;
+					}
+					int pixelValue=0;
+						
+						if(image.at<cv::Vec3b>(x,y) == cv::Vec3b(255,255,255))
+						pixelValue=0;
+						if(image.at<cv::Vec3b>(x,y) == cv::Vec3b(0,0,0))
+						pixelValue=1;
+						else
+						pixelValue=0.00001;
+						
+						if(maxDistance!=0.0)
+						{
+						realPartition[i][j]+= pixelValue*cos(2*PI*i*(radius/maxDistance)+j*theta);
+					    imaginaryPartition[i][j]-= pixelValue*sin(2*PI*i*(radius/maxDistance)+j*theta);
+						}
+				}
+			}
+		}
+	}
+	
+	double FourierCoefficients[25]={0};
+	
+	for(int i=0;i<maxFrequenceI;i++)
+	{
+		for(int j=0;j<maxFrequenceJ;j++)
+		{
+			if(i==0&&j==0&&maxDistance!=0.0)
+			FourierCoefficients[0]= sqrt(pow(realPartition[0][0],2)+pow(realPartition[0][0],2)/(PI*pow(maxDistance,2)));				
+			else		
+			FourierCoefficients[i*maxFrequenceJ+j]=sqrt(pow(realPartition[i][j],2)+pow(imaginaryPartition[i][j],2)/FourierCoefficients[0]);
+		}
+	}
+		
+	for(int i=0;i<25;i++)
+	fp<<FourierCoefficients[i]<<",";
+	
+}
+
+double findMaximumDistanceToCentroid(double centroidX,double centroidY,Mat image)
+{
+	double maxDistance=0;
+	
+	
+	for(int i=0;i<image.rows;i++)
+	{
+		for(int j=0;j<image.cols;j++)
+		{
+	      	if(image.at<cv::Vec3b>(i,j) == cv::Vec3b(255,255,255)
+	      		||image.at<cv::Vec3b>(i,j) != cv::Vec3b(0,0,0))
+	      	{
+				double value=EucliedianDistance(i,j,centroidX,centroidY);	      		
+	      		if(value>maxDistance)
+	      		maxDistance=value;
+	      		
+	      	}
+		}
+	}
+
+
+	return maxDistance;
+}
+
+double EucliedianDistance(int value1X,int value1Y,int value2X,int value2Y)
+{
+	double val;
+
+		val=sqrt((value2X-value1X)*(value2X-value1X)+(value2Y-value1Y)*(value2Y-value1Y));
+
+	return val;
+}
+
